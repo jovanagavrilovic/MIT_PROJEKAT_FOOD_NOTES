@@ -6,47 +6,59 @@ class Styles {
     required bool isDarkTheme,
     required BuildContext context,
   }) {
+    final scaffoldBg =
+        isDarkTheme ? AppColors.darkScaffold : AppColors.lightScaffold;
+    final surface =
+        isDarkTheme ? AppColors.darkSurface : AppColors.lightSurface;
+    final primary =
+        isDarkTheme ? AppColors.darkPrimary : AppColors.lightPrimary;
+    final textColor =
+        isDarkTheme ? AppColors.darkText : AppColors.lightText;
+
     final scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.lightPrimary,
+      seedColor: primary,
       brightness: isDarkTheme ? Brightness.dark : Brightness.light,
-      surface: AppColors.lightSurface,
-      background: AppColors.lightScaffold,
+      surface: surface,
+      background: scaffoldBg,
       error: AppColors.error,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: AppColors.lightScaffold,
-      cardColor: AppColors.lightSurface,
 
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.appBarBackground,
-        foregroundColor: AppColors.appBarText, 
-        elevation: 0,
-        centerTitle: false,
-        titleTextStyle: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-          color: AppColors.appBarText,
-          letterSpacing: 0.3,
-        ),
-      ),
+      scaffoldBackgroundColor: scaffoldBg,
+      cardColor: surface,
+
+    appBarTheme: AppBarTheme(
+  backgroundColor: isDarkTheme ? surface : primary,
+
+  foregroundColor: isDarkTheme ? AppColors.darkPrimary : AppColors.appBarText,
+
+  elevation: 0,
+  centerTitle: false,
+
+  titleTextStyle: TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.3,
+    color: isDarkTheme ? AppColors.darkPrimary : AppColors.appBarText,
+  ),
+),
 
 
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.lightSurface,
-        indicatorColor: AppColors.lightPrimary.withOpacity(0.15),
+        backgroundColor: surface, // 
+        indicatorColor: primary.withOpacity(0.15),
         labelTextStyle: WidgetStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
         ),
       ),
 
-      
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.lightSurface,
-        selectedColor: AppColors.lightPrimary.withOpacity(0.15),
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        backgroundColor: surface,
+        selectedColor: primary.withOpacity(0.15),
+        labelStyle: TextStyle(fontWeight: FontWeight.w600, color: textColor),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );

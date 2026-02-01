@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:food_notes/consts/app_text_styles.dart';
+import 'package:food_notes/widgets/custom_app_bar.dart';
+import 'package:food_notes/widgets/custom_end_drawer.dart';
 
 
 class HomeScreen extends StatelessWidget {
@@ -8,16 +10,10 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Food Notes"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-            },
-          ),
-        ],
-      ),
+      appBar: const CustomAppBar(title: "Food Notes"),
+      endDrawer: const CustomEndDrawer(),
+
+
       body: const Center(
         child: Text(
           "Home screen",
