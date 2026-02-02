@@ -22,11 +22,11 @@ class _RootScreenState extends State<RootScreen> {
   void initState() {
     super.initState();
 
-    screens = const [
+    screens =  [
       HomeScreen(),
       AddRecipeScreen(),
-      MyRecipesScreen(),
-      ProfileScreen(),
+      const MyRecipesScreen(),
+      const ProfileScreen(),
     ];
 
     controller = PageController(initialPage: currentScreen);

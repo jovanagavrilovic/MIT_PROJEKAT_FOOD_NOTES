@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "477935698716",
+    "project_id": "food-notes-f7038",
+    "storage_bucket": "food-notes-f7038.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:477935698716:android:73c50ce2b23a3fa5caf0d9",
+        "android_client_info": {
+          "package_name": "com.example.food_notes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChTxtfNNW6nhY2T0qZHWYnce-aTPNWhPQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
