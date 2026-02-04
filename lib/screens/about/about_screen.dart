@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 
-
-
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -29,16 +25,21 @@ class AboutScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 22,
+                ),
                 child: Column(
                   children: [
                     Image.asset('assets/images/logo.png', width: 64),
                     const SizedBox(height: 14),
 
-                    
                     const Text(
                       "Food Notes",
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 14),
 
@@ -71,14 +72,15 @@ class AboutScreen extends StatelessWidget {
                       height: 44,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                         onPressed: () => Navigator.pop(context),
+
                         child: const Text("Cook with us!"),
                       ),
                     ),
-
-
 
                     const SizedBox(height: 18),
                     const Divider(height: 1),

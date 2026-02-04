@@ -11,6 +11,7 @@ class RootScreen extends StatefulWidget {
 
   @override
   State<RootScreen> createState() => _RootScreenState();
+  
 }
 
 class _RootScreenState extends State<RootScreen> {
@@ -18,16 +19,26 @@ class _RootScreenState extends State<RootScreen> {
   int currentScreen = 0;
   late final PageController controller;
 
+  void goToTab(int index) {
+  setState(() => currentScreen = index);
+  controller.jumpToPage(index);
+}
+
+
   @override
   void initState() {
     super.initState();
 
-    screens =  [
-      HomeScreen(),
-      AddRecipeScreen(),
-      const MyRecipesScreen(),
-      const ProfileScreen(),
-    ];
+    screens = [
+  HomeScreen(),
+  AddRecipeScreen(),
+  MyRecipesScreen(
+    onGoHome: () => goToTab(0),
+    onGoAdd: () => goToTab(1),
+  ),
+  const ProfileScreen(),
+];
+
 
     controller = PageController(initialPage: currentScreen);
   }

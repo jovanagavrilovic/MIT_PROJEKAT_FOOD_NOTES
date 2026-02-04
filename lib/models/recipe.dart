@@ -81,6 +81,7 @@ Recipe copyWith({
     'prepTime': prepTime,
     'authorId': authorId,
     'imageUrl': imageUrl,
+    'createdAt': Timestamp.fromDate(createdAt),
   };
 }
 

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:food_notes/widgets/custom_app_bar.dart';
@@ -8,7 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/recipe.dart';
 import '../../services/recipe_service.dart';
 import '../auth/login_screen.dart';
-
 
 class AddRecipeScreen extends StatefulWidget {
   const AddRecipeScreen({super.key});
@@ -53,37 +53,37 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
   }
 
   void _showLoginRequiredDialog() {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("Login required"),
-      content: const Text("You need to log in to add a recipe."),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            Navigator.pop(context); 
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            );
-          },
-          child: const Text("Log in"),
-        ),
-      ],
-    ),
-  );
-}
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Login required"),
+        content: const Text("You need to log in to add a recipe."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            child: const Text("Log in"),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _saveRecipe() async {
     final user = FirebaseAuth.instance.currentUser;
-if (user == null) {
-  _showLoginRequiredDialog();
-  return;
-}
+    if (user == null) {
+      _showLoginRequiredDialog();
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
 
     if (_imageFile == null) {
@@ -97,34 +97,37 @@ if (user == null) {
 
     try {
       final imageUrl = await _service.uploadRecipeImage(_imageFile!);
-      
-final uid = user.uid;
-      
+
+      final uid = user.uid;
+
       final recipe = Recipe(
         id: '',
         title: _titleCtrl.text.trim(),
         description: _descCtrl.text.trim(),
         category: _category,
         prepTime: int.parse(_timeCtrl.text),
-        authorId: uid,
+        authorId: user.uid,
         imageUrl: imageUrl,
       );
 
-      await _service.addRecipe(recipe);
+      //await _service.addRecipe(recipe);
+      await FirebaseFirestore.instance
+          .collection('recipes')
+          .add(recipe.toMap());
 
       if (!mounted) return;
-      Navigator.pop(context); 
-    } catch (e){
+      Navigator.pop(context);
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error saving recipe: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error saving recipe: $e")));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-   @override
+  @override
   void dispose() {
     _titleCtrl.dispose();
     _descCtrl.dispose();
@@ -167,7 +170,6 @@ final uid = user.uid;
               ),
               const SizedBox(height: 10),
 
-              
               TextFormField(
                 controller: _titleCtrl,
                 decoration: const InputDecoration(labelText: "Title"),
@@ -203,8 +205,7 @@ final uid = user.uid;
               DropdownButtonFormField(
                 value: _category,
                 items: _categories
-                    .map((c) =>
-                        DropdownMenuItem(value: c, child: Text(c)))
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
                 onChanged: (v) => setState(() => _category = v!),
                 decoration: const InputDecoration(labelText: "Category"),
@@ -213,16 +214,15 @@ final uid = user.uid;
               const SizedBox(height: 30),
 
               ElevatedButton(
-  onPressed: _saving ? null : _saveRecipe,
-  child: _saving
-      ? const SizedBox(
-          height: 18,
-          width: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        )
-      : const Text("Save Recipe"),
-),
-
+                onPressed: _saving ? null : _saveRecipe,
+                child: _saving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text("Save Recipe"),
+              ),
             ],
           ),
         ),
