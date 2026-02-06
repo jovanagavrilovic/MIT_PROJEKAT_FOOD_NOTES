@@ -255,69 +255,72 @@ class _RecipeGridCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
-      child: Ink(
+      child: Container(
         decoration: BoxDecoration(
-          color: scheme.surface,
+          color: scheme.surfaceVariant,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outlineVariant.withOpacity(0.6)),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withOpacity(0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-              child: AspectRatio(
-                aspectRatio: 16 / 10,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
                 child: imageUrl.isEmpty
                     ? Container(
                         color: scheme.surfaceContainerHighest,
-                        child: const Icon(Icons.image_outlined, size: 34),
-                      )
-                    : Image.network(imageUrl, fit: BoxFit.cover),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (category.isNotEmpty)
-                        Flexible(
-                          child: Text(
-                            category,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 34,
+                          color: scheme.onSurfaceVariant,
                         ),
-                      if (prepTime != null) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          "• ${prepTime}m",
-                          style: TextStyle(
-                            fontSize: 12,
+                      )
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: scheme.surfaceContainerHighest,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 34,
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                ],
+                      ),
               ),
-            ),
-          ],
+
+              Container(
+                color: scheme.surfaceVariant,
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                child: Column(
+                  children: [
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

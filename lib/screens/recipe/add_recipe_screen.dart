@@ -98,7 +98,6 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     try {
       final imageUrl = await _service.uploadRecipeImage(_imageFile!);
 
-      final uid = user.uid;
 
       final recipe = Recipe(
         id: '',
@@ -110,7 +109,6 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
         imageUrl: imageUrl,
       );
 
-      //await _service.addRecipe(recipe);
       await FirebaseFirestore.instance
           .collection('recipes')
           .add(recipe.toMap());
@@ -140,93 +138,201 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     return Scaffold(
       appBar: const CustomAppBar(title: "Add Recipe"),
       endDrawer: const CustomEndDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              GestureDetector(
-                onTap: _saving ? null : _pickImage,
-                child: Container(
-                  height: 180,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: _imageFile == null
-                      ? const Center(
-                          child: Text("Tap to select image (required)"),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.file(
-                            _imageFile!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Card(
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          "Recipe details",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
+                        const SizedBox(height: 12),
+
+                        InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: _saving ? null : _pickImage,
+                          child: Ink(
+                            height: 170,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceVariant.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.outlineVariant.withOpacity(0.7),
+                              ),
+                            ),
+                            child: _imageFile == null
+                                ? Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.add_a_photo_outlined,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          size: 30,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          "Tap to select image (required)",
+                                          style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.75),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Image.file(
+                                      _imageFile!,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        TextFormField(
+                          controller: _titleCtrl,
+                          decoration: _formDeco(context, "Title", Icons.title),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? "Enter title"
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+
+                        TextFormField(
+                          controller: _descCtrl,
+                          maxLines: 4,
+                          decoration: _formDeco(
+                            context,
+                            "Description",
+                            Icons.notes_outlined,
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? "Enter description"
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+
+                        TextFormField(
+                          controller: _timeCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: _formDeco(
+                            context,
+                            "Prep time (min)",
+                            Icons.schedule,
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty)
+                              return "Enter time";
+                            if (int.tryParse(v) == null) return "Numbers only";
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        DropdownButtonFormField<String>(
+                          value: _category,
+                          items: _categories
+                              .map(
+                                (c) =>
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                              )
+                              .toList(),
+                          onChanged: (v) => setState(() => _category = v!),
+                          decoration: _formDeco(
+                            context,
+                            "Category",
+                            Icons.restaurant_menu,
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        SizedBox(
+                          height: 48,
+                          child: FilledButton(
+                            onPressed: _saving ? null : _saveRecipe,
+                            style: FilledButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: _saving
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text("Save Recipe"),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
-
-              TextFormField(
-                controller: _titleCtrl,
-                decoration: const InputDecoration(labelText: "Title"),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Enter title" : null,
-              ),
-
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _descCtrl,
-                decoration: const InputDecoration(labelText: "Description"),
-                maxLines: 3,
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Enter description" : null,
-              ),
-
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _timeCtrl,
-                decoration: const InputDecoration(labelText: "Prep time (min)"),
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return "Enter time";
-                  if (int.tryParse(v) == null) return "Numbers only";
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              DropdownButtonFormField(
-                value: _category,
-                items: _categories
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) => setState(() => _category = v!),
-                decoration: const InputDecoration(labelText: "Category"),
-              ),
-
-              const SizedBox(height: 30),
-
-              ElevatedButton(
-                onPressed: _saving ? null : _saveRecipe,
-                child: _saving
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text("Save Recipe"),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+InputDecoration _formDeco(BuildContext context, String label, IconData icon) {
+  final scheme = Theme.of(context).colorScheme;
+
+  return InputDecoration(
+    labelText: label,
+    prefixIcon: Icon(icon),
+    filled: true,
+    fillColor: scheme.surfaceVariant.withOpacity(0.75),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: scheme.outlineVariant.withOpacity(0.7)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: scheme.outlineVariant.withOpacity(0.7)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: scheme.primary, width: 1.4),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+  );
+  } 
