@@ -2,13 +2,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:food_notes/screens/auth/login_screen.dart';
 import 'package:food_notes/screens/auth/register_screen.dart';
+import 'package:food_notes/screens/favorites/favorites_screen.dart';
+import 'package:food_notes/screens/profile/edit_profile_screen.dart';
 import 'package:food_notes/widgets/custom_app_bar.dart';
 import 'package:food_notes/widgets/custom_end_drawer.dart';
-import 'package:food_notes/consts/app_colors.dart';
 import 'package:flutter/services.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final VoidCallback onGoHome;
+
+  const ProfileScreen({super.key, required this.onGoHome});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +22,7 @@ class ProfileScreen extends StatelessWidget {
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           child: StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
+            stream: FirebaseAuth.instance.userChanges(),
             builder: (context, snapshot) {
               final user = snapshot.data;
 
@@ -27,7 +30,7 @@ class ProfileScreen extends StatelessWidget {
                 return _LoggedOutView();
               }
 
-              return _LoggedInView(user: user);
+              return _LoggedInView(user: user, onGoHome: onGoHome);
             },
           ),
         ),
@@ -187,7 +190,9 @@ class _LoggedOutView extends StatelessWidget {
 
 class _LoggedInView extends StatelessWidget {
   final User user;
-  const _LoggedInView({required this.user});
+  final VoidCallback onGoHome;
+
+  const _LoggedInView({required this.user, required this.onGoHome});
 
   @override
   Widget build(BuildContext context) {
@@ -312,10 +317,32 @@ class _LoggedInView extends StatelessWidget {
             border: Border.all(color: theme.colorScheme.surfaceVariant),
           ),
           child: Column(
-            children: const [
-              _MenuTile(icon: Icons.edit_outlined, title: "Edit profile"),
+            children: [
+              _MenuTile(
+                icon: Icons.edit_outlined,
+                title: "Edit profile",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const EditProfileScreen(),
+                    ),
+                  );
+                },
+              ),
               _DividerSoft(),
-              _MenuTile(icon: Icons.favorite_border, title: "Favorite"),
+              _MenuTile(
+                icon: Icons.favorite_border,
+                title: "Favorite",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FavoritesScreen(onGoHome: onGoHome),
+                    ),
+                  );
+                },
+              ),
               _DividerSoft(),
             ],
           ),
@@ -336,12 +363,6 @@ class _LoggedInView extends StatelessWidget {
             ),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                );
-              }
             },
             icon: const Icon(Icons.logout_rounded),
             label: const Text(
@@ -412,8 +433,9 @@ class _InfoRow extends StatelessWidget {
 class _MenuTile extends StatelessWidget {
   final IconData icon;
   final String title;
+  final VoidCallback? onTap;
 
-  const _MenuTile({required this.icon, required this.title});
+  const _MenuTile({required this.icon, required this.title, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -422,7 +444,7 @@ class _MenuTile extends StatelessWidget {
       leading: Icon(icon, color: theme.colorScheme.primary),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () {},
+      onTap: onTap,
     );
   }
 }

@@ -23,6 +23,16 @@ class RecipeService {
       });
 }
 
+  Stream<Recipe?> getRecipeById(String id) {
+    return _recipesRef.doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data == null) return null;
+      return Recipe.fromMap(doc.id, data);
+    });
+  }
+
+
 Future<String> uploadRecipeImage(File file) async {
     final fileName = DateTime.now().millisecondsSinceEpoch.toString();
     final ref = _storage.ref().child('recipes/$fileName.jpg');

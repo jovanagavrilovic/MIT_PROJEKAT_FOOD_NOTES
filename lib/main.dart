@@ -5,14 +5,15 @@ import 'package:provider/provider.dart';
 import 'screens/root_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
+  final initialIsDark = await ThemeProvider.loadInitialTheme();
+
   runApp(
     ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+      create: (_) => ThemeProvider(initialIsDark: initialIsDark),
       child: const MyApp(),
     ),
   );

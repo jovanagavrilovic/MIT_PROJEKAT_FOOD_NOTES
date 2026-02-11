@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:food_notes/services/favorites_service.dart';
 import 'package:food_notes/widgets/custom_app_bar.dart';
 import 'package:food_notes/widgets/custom_end_drawer.dart';
 import '../../models/recipe.dart';
@@ -6,15 +8,22 @@ import '../../services/recipe_service.dart';
 import '../recipe/recipe_details_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  HomeScreen({super.key});
+  final VoidCallback onGoProfile;
+
+  HomeScreen({super.key, required this.onGoProfile});
   final RecipeService _recipeService = RecipeService();
+  final FavoriteService _favoriteService = FavoriteService();
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: const CustomAppBar(title: "Food Notes"),
+      appBar: CustomAppBar(
+        title: "Food Notes",
+        onLoginTap: onGoProfile,
+        onProfileTap: onGoProfile,
+      ),
       endDrawer: const CustomEndDrawer(),
 
       body: SafeArea(
@@ -163,14 +172,82 @@ class HomeScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Expanded(
-                                  child: Image.network(
-                                    r.imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        const Center(child: Icon(Icons.image)),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.network(
+                                        r.imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Center(
+                                              child: Icon(Icons.image),
+                                            ),
+                                      ),
+
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: StreamBuilder<bool>(
+                                          stream: _favoriteService
+                                              .isFavoriteStream(r.id),
+                                          builder: (context, favSnap) {
+                                            final isFav = favSnap.data ?? false;
+
+                                            return Material(
+                                              color: Colors.transparent,
+                                              child: InkWell(
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                                onTap: () async {
+                                                  try {
+                                                    await _favoriteService
+                                                        .toggleFavorite(r.id);
+                                                  } on FirebaseAuthException {
+                                                    if (!context.mounted)
+                                                      return;
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          "Log in to use Favorites",
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(
+                                                    8,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: scheme.surface
+                                                        .withOpacity(0.85),
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: scheme
+                                                          .outlineVariant
+                                                          .withOpacity(0.6),
+                                                    ),
+                                                  ),
+                                                  child: Icon(
+                                                    isFav
+                                                        ? Icons.favorite
+                                                        : Icons.favorite_border,
+                                                    color: isFav
+                                                        ? Colors.red
+                                                        : scheme.onSurface,
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-
                                 Container(
                                   padding: const EdgeInsets.fromLTRB(
                                     10,

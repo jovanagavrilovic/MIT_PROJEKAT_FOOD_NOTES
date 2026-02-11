@@ -8,6 +8,27 @@ class LoginScreen extends StatefulWidget {
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
+String _authErrorMessage(FirebaseAuthException e) {
+  switch (e.code) {
+    case 'invalid-email':
+      return "Email format is not valid.";
+    case 'user-not-found':
+      return "No account found with this email.";
+    case 'wrong-password':
+      return "Incorrect password.";
+    case 'invalid-credential':
+      return "Email or password is incorrect.";
+    case 'user-disabled':
+      return "This account has been disabled.";
+    case 'too-many-requests':
+      return "Too many attempts. Try again later.";
+    case 'network-request-failed':
+      return "No internet connection.";
+    default:
+      return "Login failed. Please try again.";
+  }
+}
+
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
@@ -25,9 +46,10 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
+      final message = _authErrorMessage(e);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(e.message ?? "Login failed")));
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -11,7 +11,16 @@ import '../../services/recipe_service.dart';
 import '../auth/login_screen.dart';
 
 class AddRecipeScreen extends StatefulWidget {
-  const AddRecipeScreen({super.key});
+  final VoidCallback onGoProfile;
+  final Recipe? recipe;
+  final String? recipeId;
+
+  const AddRecipeScreen({
+    super.key,
+    required this.onGoProfile,
+    this.recipe,
+    this.recipeId,
+  });
 
   @override
   State<AddRecipeScreen> createState() => _AddRecipeScreenState();
@@ -23,6 +32,42 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _timeCtrl = TextEditingController();
+
+  bool get _isEdit => widget.recipe != null && widget.recipeId != null;
+
+  Widget _imagePlaceholder() {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add_a_photo_outlined, color: scheme.primary, size: 30),
+          const SizedBox(height: 8),
+          Text(
+            _isEdit ? "Tap to change image" : "Tap to select image (required)",
+            style: TextStyle(
+              color: scheme.onSurface.withOpacity(0.75),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    final r = widget.recipe;
+    if (r != null) {
+      _titleCtrl.text = r.title;
+      _descCtrl.text = r.description;
+      _timeCtrl.text = r.prepTime.toString();
+      _category = r.category;
+    }
+  }
 
   String _category = "Breakfast";
   final _service = RecipeService();
@@ -57,7 +102,11 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Login required"),
-        content: const Text("You need to log in to add a recipe."),
+        content: Text(
+          _isEdit
+              ? "You need to log in to edit a recipe."
+              : "You need to log in to add a recipe.",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -86,7 +135,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     }
     if (!_formKey.currentState!.validate()) return;
 
-    if (_imageFile == null) {
+    if (!_isEdit && _imageFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select an image (required).")),
       );
@@ -96,22 +145,37 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     setState(() => _saving = true);
 
     try {
-      final imageUrl = await _service.uploadRecipeImage(_imageFile!);
+      String imageUrl;
 
+      if (_imageFile != null) {
+        imageUrl = await _service.uploadRecipeImage(_imageFile!);
+      } else {
+        imageUrl = widget.recipe!.imageUrl;
+      }
 
-      final recipe = Recipe(
-        id: '',
+      final recipeMap = Recipe(
+        id: _isEdit ? widget.recipeId! : '',
         title: _titleCtrl.text.trim(),
         description: _descCtrl.text.trim(),
         category: _category,
         prepTime: int.parse(_timeCtrl.text),
         authorId: user.uid,
         imageUrl: imageUrl,
-      );
+      ).toMap();
 
-      await FirebaseFirestore.instance
-          .collection('recipes')
-          .add(recipe.toMap());
+      final recipesRef = FirebaseFirestore.instance.collection('recipes');
+
+      if (_isEdit) {
+        await recipesRef.doc(widget.recipeId!).update({
+          ...recipeMap,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await recipesRef.add({
+          ...recipeMap,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -136,7 +200,11 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: "Add Recipe"),
+      appBar: CustomAppBar(
+        title: _isEdit ? "Edit Recipe" : "Add Recipe",
+        onLoginTap: widget.onGoProfile,
+        onProfileTap: widget.onGoProfile,
+      ),
       endDrawer: const CustomEndDrawer(),
       body: SafeArea(
         child: Center(
@@ -183,40 +251,26 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                                 ).colorScheme.outlineVariant.withOpacity(0.7),
                               ),
                             ),
-                            child: _imageFile == null
-                                ? Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.add_a_photo_outlined,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                          size: 30,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          "Tap to select image (required)",
-                                          style: TextStyle(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withOpacity(0.75),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : ClipRRect(
-                                    borderRadius: BorderRadius.circular(18),
-                                    child: Image.file(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: _imageFile != null
+                                  ? Image.file(
                                       _imageFile!,
                                       fit: BoxFit.cover,
                                       width: double.infinity,
-                                    ),
-                                  ),
+                                    )
+                                  : (_isEdit &&
+                                        (widget.recipe?.imageUrl.isNotEmpty ??
+                                            false))
+                                  ? Image.network(
+                                      widget.recipe!.imageUrl,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      errorBuilder: (_, __, ___) =>
+                                          _imagePlaceholder(),
+                                    )
+                                  : _imagePlaceholder(),
+                            ),
                           ),
                         ),
 
@@ -297,7 +351,9 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text("Save Recipe"),
+                                : Text(
+                                    _isEdit ? "Save changes" : "Save Recipe",
+                                  ),
                           ),
                         ),
                       ],
@@ -335,4 +391,4 @@ InputDecoration _formDeco(BuildContext context, String label, IconData icon) {
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
   );
-  } 
+}

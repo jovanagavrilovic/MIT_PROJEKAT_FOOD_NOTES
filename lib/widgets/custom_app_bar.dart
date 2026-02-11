@@ -1,12 +1,17 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:food_notes/screens/auth/login_screen.dart';
-import 'package:food_notes/screens/profile/profile_screen.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final VoidCallback? onProfileTap;
+  final VoidCallback? onLoginTap;
 
-  const CustomAppBar({super.key, required this.title});
+  const CustomAppBar({
+    super.key,
+    required this.title,
+    this.onProfileTap,
+    this.onLoginTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,30 +28,20 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
       actions: [
         StreamBuilder<User?>(
-          stream: FirebaseAuth.instance.authStateChanges(),
+          stream: FirebaseAuth.instance.userChanges(),
           builder: (context, snapshot) {
             final user = snapshot.data;
 
             if (user == null) {
               return TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
-                },
+                onPressed: onLoginTap,
                 child: const Text("Login"),
               );
             }
 
             return InkWell(
               borderRadius: BorderRadius.circular(14),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                );
-              },
+              onTap: onProfileTap,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Container(

@@ -11,7 +11,6 @@ class RootScreen extends StatefulWidget {
 
   @override
   State<RootScreen> createState() => _RootScreenState();
-  
 }
 
 class _RootScreenState extends State<RootScreen> {
@@ -20,41 +19,39 @@ class _RootScreenState extends State<RootScreen> {
   late final PageController controller;
 
   void goToTab(int index) {
-  setState(() => currentScreen = index);
-  controller.jumpToPage(index);
-}
-
+    setState(() => currentScreen = index);
+    controller.jumpToPage(index);
+  }
 
   @override
   void initState() {
     super.initState();
 
     screens = [
-  HomeScreen(),
-  AddRecipeScreen(),
-  MyRecipesScreen(
-    onGoHome: () => goToTab(0),
-    onGoAdd: () => goToTab(1),
-  ),
-  const ProfileScreen(),
-];
-
+      HomeScreen(onGoProfile: () => goToTab(3)),
+      AddRecipeScreen(onGoProfile: () => goToTab(3)),
+      MyRecipesScreen(
+        onGoHome: () => goToTab(0),
+        onGoAdd: () => goToTab(1),
+        onGoProfile: () => goToTab(3),
+      ),
+      ProfileScreen(onGoHome: () => goToTab(0)),
+    ];
 
     controller = PageController(initialPage: currentScreen);
   }
 
   @override
   void dispose() {
-    controller.dispose(); 
+    controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       body: PageView(
-        physics: const NeverScrollableScrollPhysics(), 
+        physics: const NeverScrollableScrollPhysics(),
         controller: controller,
         children: screens,
       ),

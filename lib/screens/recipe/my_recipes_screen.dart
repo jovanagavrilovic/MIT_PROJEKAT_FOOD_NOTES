@@ -3,15 +3,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:food_notes/widgets/custom_app_bar.dart';
 import 'package:food_notes/widgets/custom_end_drawer.dart';
+import 'package:food_notes/screens/recipe/add_recipe_screen.dart';
+import '../../models/recipe.dart';
 
 class MyRecipesScreen extends StatelessWidget {
   final VoidCallback onGoHome;
   final VoidCallback onGoAdd;
+  final VoidCallback onGoProfile;
 
   const MyRecipesScreen({
     super.key,
     required this.onGoHome,
     required this.onGoAdd,
+    required this.onGoProfile,
   });
 
   @override
@@ -25,20 +29,19 @@ class MyRecipesScreen extends StatelessWidget {
 
         if (user == null) {
           return Scaffold(
-            appBar: const CustomAppBar(title: "My Recipes"),
+            appBar: CustomAppBar(
+              title: "My Recipes",
+              onLoginTap: onGoProfile,
+              onProfileTap: onGoProfile,
+            ),
             endDrawer: const CustomEndDrawer(),
             body: _EmptyCard(
               icon: Icons.lock_outline,
               title: "Log in to see your recipes",
               subtitle: "Your saved recipes will appear here once you log in.",
               primaryText: "Login",
-              onPrimary: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Use the Login button in the top bar."),
-                  ),
-                );
-              },
+              onPrimary: onGoProfile,
+
               secondaryText: "Explore recipes",
               onSecondary: onGoHome,
             ),
@@ -101,22 +104,86 @@ class MyRecipesScreen extends StatelessWidget {
                                 childAspectRatio: 0.80,
                               ),
                           itemBuilder: (context, i) {
-                            final data = docs[i].data();
+                            final doc = docs[i];
+                            final data = doc.data();
+
                             final title = (data['title'] ?? '').toString();
-                            final category = (data['category'] ?? '')
+                            final category = (data['category'] ?? 'Breakfast')
                                 .toString();
                             final imageUrl = (data['imageUrl'] ?? '')
                                 .toString();
-                            final prepTime = data['prepTime'];
+
+                            final prepTimeRaw = data['prepTime'];
+                            final prepTimeInt = prepTimeRaw is int
+                                ? prepTimeRaw
+                                : int.tryParse(
+                                        prepTimeRaw?.toString() ?? '0',
+                                      ) ??
+                                      0;
+
+                            final recipeForEdit = Recipe(
+                              id: doc.id,
+                              title: title.isEmpty ? "Untitled" : title,
+                              description: (data['description'] ?? '')
+                                  .toString(),
+                              category: category,
+                              prepTime: prepTimeInt,
+                              authorId: (data['authorId'] ?? '').toString(),
+                              imageUrl: imageUrl,
+                            );
 
                             return _RecipeGridCard(
-                              title: title.isEmpty ? "Untitled" : title,
-                              category: category,
-                              imageUrl: imageUrl,
-                              prepTime: prepTime == null
+                              title: recipeForEdit.title,
+                              category: recipeForEdit.category,
+                              imageUrl: recipeForEdit.imageUrl,
+                              prepTime: prepTimeRaw == null
                                   ? null
-                                  : prepTime.toString(),
+                                  : prepTimeRaw.toString(),
                               onTap: () {},
+
+                              onEdit: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AddRecipeScreen(
+                                      onGoProfile: onGoProfile,
+                                      recipe: recipeForEdit,
+                                      recipeId: doc.id,
+                                    ),
+                                  ),
+                                );
+                              },
+
+                              onDelete: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text("Delete recipe"),
+                                    content: const Text(
+                                      "Are you sure you want to delete this recipe? This action cannot be undone.",
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text("Cancel"),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text("Delete"),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirm == true) {
+                                  await FirebaseFirestore.instance
+                                      .collection('recipes')
+                                      .doc(doc.id)
+                                      .delete();
+                                }
+                              },
                             );
                           },
                         ),
@@ -239,6 +306,8 @@ class _RecipeGridCard extends StatelessWidget {
   final String imageUrl;
   final String? prepTime;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _RecipeGridCard({
     required this.title,
@@ -246,6 +315,8 @@ class _RecipeGridCard extends StatelessWidget {
     required this.imageUrl,
     required this.prepTime,
     required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -275,29 +346,64 @@ class _RecipeGridCard extends StatelessWidget {
             children: [
               AspectRatio(
                 aspectRatio: 1,
-                child: imageUrl.isEmpty
-                    ? Container(
-                        color: scheme.surfaceContainerHighest,
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.image_outlined,
-                          size: 34,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      )
-                    : Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: scheme.surfaceContainerHighest,
-                          alignment: Alignment.center,
-                          child: Icon(
-                            Icons.image_outlined,
-                            size: 34,
-                            color: scheme.onSurfaceVariant,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    imageUrl.isEmpty
+                        ? Container(
+                            color: scheme.surfaceContainerHighest,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.image_outlined,
+                              size: 34,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          )
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: scheme.surfaceContainerHighest,
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.image_outlined,
+                                size: 34,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
                           ),
-                        ),
+
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Row(
+                        children: [
+                          Material(
+                            color: scheme.surface.withOpacity(0.85),
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              visualDensity: VisualDensity.compact,
+                              icon: const Icon(Icons.edit, size: 18),
+                              onPressed: onEdit,
+                              tooltip: "Edit",
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Material(
+                            color: scheme.surface.withOpacity(0.85),
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              visualDensity: VisualDensity.compact,
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              onPressed: onDelete,
+                              tooltip: "Delete",
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                  ],
+                ),
               ),
 
               Container(
