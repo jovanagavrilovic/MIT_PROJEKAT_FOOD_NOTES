@@ -5,12 +5,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final VoidCallback? onProfileTap;
   final VoidCallback? onLoginTap;
+  final bool isAdmin;
 
   const CustomAppBar({
     super.key,
     required this.title,
     this.onProfileTap,
     this.onLoginTap,
+    this.isAdmin = false,
   });
 
   @override
@@ -19,12 +21,42 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       titleSpacing: 0,
 
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: Image.asset('assets/images/logo.png', width: 30, height: 30),
-      ),
+      leading: isAdmin
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 30,
+                height: 30,
+              ),
+            ),
 
-      title: Text(title),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title),
+          if (isAdmin) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                "ADMIN",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
 
       actions: [
         StreamBuilder<User?>(

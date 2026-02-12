@@ -5,6 +5,7 @@ import 'package:food_notes/widgets/custom_app_bar.dart';
 import 'package:food_notes/widgets/custom_end_drawer.dart';
 import 'package:food_notes/screens/recipe/add_recipe_screen.dart';
 import '../../models/recipe.dart';
+import 'package:food_notes/screens/recipe/recipe_details_screen.dart';
 
 class MyRecipesScreen extends StatelessWidget {
   final VoidCallback onGoHome;
@@ -121,7 +122,34 @@ class MyRecipesScreen extends StatelessWidget {
                                       ) ??
                                       0;
 
-                            final recipeForEdit = Recipe(
+                            final servingsRaw = data['servings'];
+                            final servingsInt = servingsRaw is int
+                                ? servingsRaw
+                                : int.tryParse(servingsRaw?.toString() ?? '') ??
+                                      1;
+
+                            final difficulty = (data['difficulty'] ?? 'Easy')
+                                .toString();
+
+                            final tags =
+                                (data['tags'] as List?)
+                                    ?.map((e) => e.toString())
+                                    .toList() ??
+                                [];
+
+                            final ingredients =
+                                (data['ingredients'] as List?)
+                                    ?.map((e) => e.toString())
+                                    .toList() ??
+                                [];
+
+                            final steps =
+                                (data['steps'] as List?)
+                                    ?.map((e) => e.toString())
+                                    .toList() ??
+                                [];
+
+                            final recipe = Recipe(
                               id: doc.id,
                               title: title.isEmpty ? "Untitled" : title,
                               description: (data['description'] ?? '')
@@ -130,16 +158,30 @@ class MyRecipesScreen extends StatelessWidget {
                               prepTime: prepTimeInt,
                               authorId: (data['authorId'] ?? '').toString(),
                               imageUrl: imageUrl,
+                              servings: servingsInt,
+                              difficulty: difficulty,
+                              tags: tags,
+                              ingredients: ingredients,
+                              steps: steps,
                             );
 
                             return _RecipeGridCard(
-                              title: recipeForEdit.title,
-                              category: recipeForEdit.category,
-                              imageUrl: recipeForEdit.imageUrl,
+                              title: recipe.title,
+                              category: recipe.category,
+                              imageUrl: recipe.imageUrl,
+
                               prepTime: prepTimeRaw == null
                                   ? null
                                   : prepTimeRaw.toString(),
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        RecipeDetailsScreen(recipe: recipe),
+                                  ),
+                                );
+                              },
 
                               onEdit: () {
                                 Navigator.push(
@@ -147,7 +189,7 @@ class MyRecipesScreen extends StatelessWidget {
                                   MaterialPageRoute(
                                     builder: (_) => AddRecipeScreen(
                                       onGoProfile: onGoProfile,
-                                      recipe: recipeForEdit,
+                                      recipe: recipe,
                                       recipeId: doc.id,
                                     ),
                                   ),
@@ -195,7 +237,11 @@ class MyRecipesScreen extends StatelessWidget {
             }
 
             return Scaffold(
-              appBar: CustomAppBar(title: appBarTitle),
+              appBar: CustomAppBar(
+                title: appBarTitle,
+                onLoginTap: onGoProfile,
+                onProfileTap: onGoProfile,
+              ),
               endDrawer: const CustomEndDrawer(),
               body: body,
             );

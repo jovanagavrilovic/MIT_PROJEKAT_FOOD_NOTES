@@ -9,6 +9,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/recipe.dart';
 import '../../services/recipe_service.dart';
 import '../auth/login_screen.dart';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AddRecipeScreen extends StatefulWidget {
   final VoidCallback onGoProfile;
@@ -26,12 +28,76 @@ class AddRecipeScreen extends StatefulWidget {
   State<AddRecipeScreen> createState() => _AddRecipeScreenState();
 }
 
+class _IngredientRow {
+  final TextEditingController nameCtrl;
+  final TextEditingController amountCtrl;
+  String unit;
+
+  _IngredientRow({String name = "", String amount = "", this.unit = "g"})
+    : nameCtrl = TextEditingController(text: name),
+      amountCtrl = TextEditingController(text: amount);
+
+  void dispose() {
+    nameCtrl.dispose();
+    amountCtrl.dispose();
+  }
+}
+
 class _AddRecipeScreenState extends State<AddRecipeScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _timeCtrl = TextEditingController();
+
+  final _servingsCtrl = TextEditingController();
+
+  final List<_IngredientRow> _ingredients = [];
+  final List<String> _units = const ["g", "ml", "pcs"];
+  final List<TextEditingController> _stepCtrls = [];
+
+  String _difficulty = "Easy";
+
+  final List<String> _difficulties = ["Easy", "Medium", "Hard"];
+
+  final List<String> _allTags = [
+    "Quick",
+    "Vegan",
+    "Vegetarian",
+    "Gluten-free",
+    "Healthy",
+    "Spicy",
+    "Kids",
+    "Lenten",
+  ];
+  final Set<String> _selectedTags = {};
+
+  _IngredientRow _parseIngredient(String raw) {
+    final parts = raw.split("|");
+    if (parts.length < 2) {
+      return _IngredientRow(name: raw.trim(), amount: "", unit: "g");
+    }
+
+    final name = parts[0].trim();
+    final right = parts[1].trim();
+    final tokens = right.split(RegExp(r"\s+"));
+    String amount = "";
+    String unit = "g";
+
+    if (tokens.isNotEmpty) amount = tokens[0].trim();
+    if (tokens.length >= 2) {
+      final u = tokens[1].trim();
+      if (_units.contains(u)) unit = u;
+    }
+
+    return _IngredientRow(name: name, amount: amount, unit: unit);
+  }
+
+  String _formatIngredient(_IngredientRow r) {
+    final name = r.nameCtrl.text.trim();
+    final amount = r.amountCtrl.text.trim();
+    return "$name | $amount ${r.unit}";
+  }
 
   bool get _isEdit => widget.recipe != null && widget.recipeId != null;
 
@@ -56,6 +122,268 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     );
   }
 
+  Widget _reorderableTextList({
+    required String title,
+    required List<TextEditingController> ctrls,
+    required VoidCallback onAdd,
+    required void Function(int oldIndex, int newIndex) onReorder,
+    required String hint,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _saving ? null : onAdd,
+                  icon: const Icon(Icons.add),
+                  label: const Text("Add"),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: ctrls.length,
+              onReorder: (oldIndex, newIndex) {
+                if (_saving) return;
+                if (newIndex > oldIndex) newIndex -= 1;
+                onReorder(oldIndex, newIndex);
+              },
+              itemBuilder: (context, i) {
+                return Container(
+                  key: ValueKey(ctrls[i]),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceVariant.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: scheme.outlineVariant.withOpacity(0.7),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      ReorderableDragStartListener(
+                        index: i,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Icon(Icons.drag_handle),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextFormField(
+                          controller: ctrls[i],
+                          decoration: InputDecoration(
+                            hintText: hint,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
+                          ),
+                          validator: (v) {
+                            if (ctrls.length == 1 &&
+                                (v == null || v.trim().isEmpty)) {
+                              return "Required";
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: (_saving || ctrls.length == 1)
+                            ? null
+                            : () {
+                                setState(() {
+                                  ctrls[i].dispose();
+                                  ctrls.removeAt(i);
+                                });
+                              },
+                        icon: const Icon(Icons.close),
+                        tooltip: "Remove",
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reorderableIngredientList() {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    "Ingredients",
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _saving
+                      ? null
+                      : () =>
+                            setState(() => _ingredients.add(_IngredientRow())),
+                  icon: const Icon(Icons.add),
+                  label: const Text("Add"),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _ingredients.length,
+              onReorder: (oldIndex, newIndex) {
+                if (_saving) return;
+                if (newIndex > oldIndex) newIndex -= 1;
+                setState(() {
+                  final item = _ingredients.removeAt(oldIndex);
+                  _ingredients.insert(newIndex, item);
+                });
+              },
+              itemBuilder: (context, i) {
+                final row = _ingredients[i];
+
+                return Container(
+                  key: ValueKey(row),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceVariant.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: scheme.outlineVariant.withOpacity(0.7),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        ReorderableDragStartListener(
+                          index: i,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6),
+                            child: Icon(Icons.drag_handle),
+                          ),
+                        ),
+
+                        Expanded(
+                          flex: 5,
+                          child: TextFormField(
+                            controller: row.nameCtrl,
+                            decoration: const InputDecoration(
+                              hintText: "Ingredient",
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 10,
+                              ),
+                            ),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? "Required"
+                                : null,
+                          ),
+                        ),
+
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            controller: row.amountCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              hintText: "Qty",
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 10,
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty)
+                                return "Required";
+                              final n = double.tryParse(
+                                v.trim().replaceAll(",", "."),
+                              );
+                              if (n == null || n <= 0) return "Invalid";
+                              return null;
+                            },
+                          ),
+                        ),
+
+                        DropdownButton<String>(
+                          value: row.unit,
+                          underline: const SizedBox.shrink(),
+                          items: _units
+                              .map(
+                                (u) =>
+                                    DropdownMenuItem(value: u, child: Text(u)),
+                              )
+                              .toList(),
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => row.unit = v!),
+                        ),
+
+                        IconButton(
+                          onPressed: (_saving || _ingredients.length == 1)
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _ingredients[i].dispose();
+                                    _ingredients.removeAt(i);
+                                  });
+                                },
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,13 +394,29 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       _descCtrl.text = r.description;
       _timeCtrl.text = r.prepTime.toString();
       _category = r.category;
+
+      _difficulty = r.difficulty ?? "Easy";
+      _servingsCtrl.text = (r.servings ?? 1).toString();
+      _selectedTags.addAll(r.tags ?? []);
+
+      for (final ing in (r.ingredients ?? [])) {
+        _ingredients.add(_parseIngredient(ing));
+      }
+
+      for (final st in (r.steps ?? [])) {
+        _stepCtrls.add(TextEditingController(text: st));
+      }
     }
+
+    if (_ingredients.isEmpty) _ingredients.add(_IngredientRow());
+    if (_stepCtrls.isEmpty) _stepCtrls.add(TextEditingController());
   }
 
   String _category = "Breakfast";
   final _service = RecipeService();
 
-  File? _imageFile;
+  XFile? _pickedImage;
+  Uint8List? _webImageBytes;
   bool _saving = false;
 
   final List<String> _categories = [
@@ -92,9 +436,18 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
 
     if (xfile == null) return;
 
-    setState(() {
-      _imageFile = File(xfile.path);
-    });
+    if (kIsWeb) {
+      final bytes = await xfile.readAsBytes();
+      setState(() {
+        _pickedImage = xfile;
+        _webImageBytes = bytes;
+      });
+    } else {
+      setState(() {
+        _pickedImage = xfile;
+        _webImageBytes = null;
+      });
+    }
   }
 
   void _showLoginRequiredDialog() {
@@ -133,52 +486,95 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       _showLoginRequiredDialog();
       return;
     }
+
     if (!_formKey.currentState!.validate()) return;
 
-    if (!_isEdit && _imageFile == null) {
+    if (!_isEdit && _pickedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select an image (required).")),
       );
       return;
     }
 
+    if (_saving) return;
     setState(() => _saving = true);
 
     try {
-      String imageUrl;
+      final prepTime = int.tryParse(_timeCtrl.text.trim());
+      final servings = int.tryParse(_servingsCtrl.text.trim());
 
-      if (_imageFile != null) {
-        imageUrl = await _service.uploadRecipeImage(_imageFile!);
+      if (prepTime == null || servings == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Prep time and servings must be numbers."),
+          ),
+        );
+        return;
+      }
+
+      String imageUrl;
+      if (_pickedImage != null) {
+        imageUrl = await _service.uploadRecipeImage(
+          file: _pickedImage!,
+          webBytes: _webImageBytes,
+        );
       } else {
         imageUrl = widget.recipe!.imageUrl;
       }
 
-      final recipeMap = Recipe(
-        id: _isEdit ? widget.recipeId! : '',
-        title: _titleCtrl.text.trim(),
-        description: _descCtrl.text.trim(),
-        category: _category,
-        prepTime: int.parse(_timeCtrl.text),
-        authorId: user.uid,
-        imageUrl: imageUrl,
-      ).toMap();
+      final ingredients = _ingredients
+          .map(_formatIngredient)
+          .where((s) => !s.startsWith("|"))
+          .toList();
+
+      final steps = _stepCtrls
+          .map((c) => c.text.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      if (ingredients.isEmpty || steps.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please add at least 1 ingredient and 1 step."),
+          ),
+        );
+        return;
+      }
 
       final recipesRef = FirebaseFirestore.instance.collection('recipes');
 
+      final docRef = _isEdit
+          ? recipesRef.doc(widget.recipeId!)
+          : recipesRef.doc();
+
+      final recipeMap = Recipe(
+        id: docRef.id,
+        title: _titleCtrl.text.trim(),
+        description: _descCtrl.text.trim(),
+        category: _category,
+        prepTime: prepTime,
+        authorId: user.uid,
+        imageUrl: imageUrl,
+        servings: servings,
+        difficulty: _difficulty,
+        tags: _selectedTags.toList(),
+        ingredients: ingredients,
+        steps: steps,
+      ).toMap();
+
       if (_isEdit) {
-        await recipesRef.doc(widget.recipeId!).update({
-          ...recipeMap,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        await docRef.update({...recipeMap, 'updatedAt': Timestamp.now()});
       } else {
-        await recipesRef.add({
-          ...recipeMap,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        await docRef.set({...recipeMap, 'createdAt': Timestamp.now()});
       }
 
       if (!mounted) return;
-      Navigator.pop(context);
+
+      setState(() => _saving = false);
+      Navigator.pop(context, true);
+      return;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -194,6 +590,15 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _timeCtrl.dispose();
+    _servingsCtrl.dispose();
+
+    for (final r in _ingredients) {
+      r.dispose();
+    }
+
+    for (final c in _stepCtrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -253,12 +658,20 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(18),
-                              child: _imageFile != null
-                                  ? Image.file(
-                                      _imageFile!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                    )
+                              child: _pickedImage != null
+                                  ? (kIsWeb
+                                        ? (_webImageBytes != null
+                                              ? Image.memory(
+                                                  _webImageBytes!,
+                                                  fit: BoxFit.cover,
+                                                  width: double.infinity,
+                                                )
+                                              : _imagePlaceholder())
+                                        : Image.file(
+                                            File(_pickedImage!.path),
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                          ))
                                   : (_isEdit &&
                                         (widget.recipe?.imageUrl.isNotEmpty ??
                                             false))
@@ -316,6 +729,26 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                         ),
                         const SizedBox(height: 12),
 
+                        TextFormField(
+                          controller: _servingsCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: _formDeco(
+                            context,
+                            "Servings",
+                            Icons.groups_2_outlined,
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty)
+                              return "Enter servings";
+                            final n = int.tryParse(v.trim());
+                            if (n == null || n <= 0)
+                              return "Must be a positive number";
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
                         DropdownButtonFormField<String>(
                           value: _category,
                           items: _categories
@@ -324,12 +757,81 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                                     DropdownMenuItem(value: c, child: Text(c)),
                               )
                               .toList(),
-                          onChanged: (v) => setState(() => _category = v!),
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _category = v!),
                           decoration: _formDeco(
                             context,
                             "Category",
                             Icons.restaurant_menu,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        DropdownButtonFormField<String>(
+                          value: _difficulty,
+                          items: _difficulties
+                              .map(
+                                (d) =>
+                                    DropdownMenuItem(value: d, child: Text(d)),
+                              )
+                              .toList(),
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _difficulty = v!),
+                          decoration: _formDeco(
+                            context,
+                            "Difficulty",
+                            Icons.speed,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Text(
+                          "Tags",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _allTags.map((t) {
+                            final selected = _selectedTags.contains(t);
+                            return FilterChip(
+                              label: Text(t),
+                              selected: selected,
+                              onSelected: _saving
+                                  ? null
+                                  : (v) => setState(() {
+                                      v
+                                          ? _selectedTags.add(t)
+                                          : _selectedTags.remove(t);
+                                    }),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+
+                        _reorderableIngredientList(),
+
+                        const SizedBox(height: 12),
+
+                        _reorderableTextList(
+                          title: "Steps",
+                          ctrls: _stepCtrls,
+                          hint: "e.g. Mix everything well",
+                          onAdd: () => setState(
+                            () => _stepCtrls.add(TextEditingController()),
+                          ),
+                          onReorder: (a, b) => setState(() {
+                            final item = _stepCtrls.removeAt(a);
+                            _stepCtrls.insert(b, item);
+                          }),
                         ),
 
                         const SizedBox(height: 16),

@@ -6,13 +6,95 @@ import 'package:food_notes/widgets/custom_end_drawer.dart';
 import '../../models/recipe.dart';
 import '../../services/recipe_service.dart';
 import '../recipe/recipe_details_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final VoidCallback onGoProfile;
 
-  HomeScreen({super.key, required this.onGoProfile});
+  const HomeScreen({super.key, required this.onGoProfile});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   final RecipeService _recipeService = RecipeService();
   final FavoriteService _favoriteService = FavoriteService();
+
+  final _searchCtrl = TextEditingController();
+
+  String _selectedCategory = "All";
+  String _q = "";
+  String _role = "user";
+  bool _isBlocked = false;
+
+  final _categories = const ["All", "Breakfast", "Lunch", "Dinner", "Dessert", "Snack"];
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() {
+      setState(() {
+        _q = _searchCtrl.text.trim().toLowerCase();
+      });
+    });
+    _loadUserRole();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUserRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(user.uid)
+        .get();
+
+    if (!doc.exists) return;
+
+    final data = doc.data() ?? {};
+
+    final role = (data["role"] ?? "user").toString();
+    final blocked = (data["isBlocked"] ?? false) == true;
+
+    if (!mounted) return;
+
+    setState(() {
+      _role = role;
+      _isBlocked = blocked;
+    });
+
+    if (blocked) {
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Your account has been blocked by admin."),
+        ),
+      );
+    }
+  }
+
+  bool _matches(Recipe r) {
+    final categoryOk =
+        _selectedCategory == "All" ||
+        r.category.trim().toLowerCase() == _selectedCategory.toLowerCase();
+
+    if (_q.isEmpty) return categoryOk;
+
+    final inTitle = r.title.toLowerCase().contains(_q);
+    final inDesc = r.description.toLowerCase().contains(_q);
+    final inTags = r.tags.any((t) => t.trim().toLowerCase().contains(_q));
+
+    return categoryOk && (inTitle || inDesc || inTags);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,10 +103,11 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: CustomAppBar(
         title: "Food Notes",
-        onLoginTap: onGoProfile,
-        onProfileTap: onGoProfile,
+        onLoginTap: widget.onGoProfile,
+        onProfileTap: widget.onGoProfile,
+        isAdmin: _role == "admin",
       ),
-      endDrawer: const CustomEndDrawer(),
+      endDrawer: _isBlocked ? null : CustomEndDrawer(isAdmin: _role == "admin"),
 
       body: SafeArea(
         child: Column(
@@ -34,10 +117,19 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 children: [
                   TextField(
-                    onChanged: (_) {},
+                    controller: _searchCtrl,
                     decoration: InputDecoration(
                       hintText: "Search recipes...",
                       prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _q.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                FocusScope.of(context).unfocus();
+                              },
+                            )
+                          : null,
                       filled: true,
                       fillColor: scheme.surfaceVariant.withOpacity(0.7),
                       border: OutlineInputBorder(
@@ -66,13 +158,17 @@ class HomeScreen extends StatelessWidget {
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: [
-                        _chip("All", true, scheme),
-                        _chip("Breakfast", false, scheme),
-                        _chip("Lunch", false, scheme),
-                        _chip("Dinner", false, scheme),
-                        _chip("Dessert", false, scheme),
-                      ],
+                      children: _categories.map((c) {
+                        return _chip(
+                          c,
+                          c == _selectedCategory,
+                          scheme,
+                          onTap: () {
+                            FocusScope.of(context).unfocus();
+                            setState(() => _selectedCategory = c);
+                          },
+                        );
+                      }).toList(),
                     ),
                   ),
                 ],
@@ -97,6 +193,7 @@ class HomeScreen extends StatelessWidget {
                   }
 
                   final recipes = snapshot.data ?? [];
+                  final filtered = recipes.where(_matches).toList();
 
                   if (recipes.isEmpty) {
                     return Center(
@@ -128,6 +225,16 @@ class HomeScreen extends StatelessWidget {
                       ),
                     );
                   }
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Text(
+                        "No recipes found.",
+                        style: TextStyle(
+                          color: scheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    );
+                  }
 
                   return GridView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
@@ -138,9 +245,9 @@ class HomeScreen extends StatelessWidget {
                           mainAxisSpacing: 12,
                           childAspectRatio: 0.85,
                         ),
-                    itemCount: recipes.length,
+                    itemCount: filtered.length,
                     itemBuilder: (context, index) {
-                      final r = recipes[index];
+                      final r = filtered[index];
 
                       return InkWell(
                         borderRadius: BorderRadius.circular(16),
@@ -148,7 +255,10 @@ class HomeScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => RecipeDetailsScreen(recipe: r),
+                              builder: (_) => RecipeDetailsScreen(
+                                recipe: r,
+                                isAdmin: _role == "admin",
+                              ),
                             ),
                           );
                         },
@@ -183,6 +293,97 @@ class HomeScreen extends StatelessWidget {
                                               child: Icon(Icons.image),
                                             ),
                                       ),
+                                      if (_role == "admin")
+                                        Positioned(
+                                          top: 8,
+                                          left: 8,
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              onTap: () async {
+                                                final confirm = await showDialog<bool>(
+                                                  context: context,
+                                                  builder: (context) {
+                                                    return AlertDialog(
+                                                      title: const Text(
+                                                        "Delete recipe",
+                                                      ),
+                                                      content: const Text(
+                                                        "Are you sure you want to permanently delete this recipe?",
+                                                      ),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                context,
+                                                                false,
+                                                              ),
+                                                          child: const Text(
+                                                            "Cancel",
+                                                          ),
+                                                        ),
+                                                        ElevatedButton(
+                                                          style:
+                                                              ElevatedButton.styleFrom(
+                                                                backgroundColor:
+                                                                    Colors.red,
+                                                              ),
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                context,
+                                                                true,
+                                                              ),
+                                                          child: const Text(
+                                                            "Delete",
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    );
+                                                  },
+                                                );
+
+                                                if (confirm == true) {
+                                                  await _recipeService
+                                                      .deleteRecipe(r.id);
+
+                                                  if (!context.mounted) return;
+
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        "Recipe deleted successfully",
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+
+                                              child: Container(
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: scheme.surface
+                                                      .withOpacity(0.85),
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: scheme.outlineVariant
+                                                        .withOpacity(0.6),
+                                                  ),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
 
                                       Positioned(
                                         top: 8,
@@ -286,21 +487,30 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-Widget _chip(String text, bool selected, ColorScheme scheme) {
+Widget _chip(
+  String text,
+  bool selected,
+  ColorScheme scheme, {
+  required VoidCallback onTap,
+}) {
   return Padding(
     padding: const EdgeInsets.only(right: 8),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? scheme.primary : scheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: scheme.outlineVariant.withOpacity(0.6)),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: selected ? scheme.onPrimary : scheme.onSurface,
-          fontWeight: FontWeight.w600,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? scheme.primary : scheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: scheme.outlineVariant.withOpacity(0.6)),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: selected ? scheme.onPrimary : scheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     ),
